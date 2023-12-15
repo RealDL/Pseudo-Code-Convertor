@@ -9,7 +9,9 @@ This script turns regular python code into OCR A-Level pseudocode. It is not exa
 3. Copy your pseudocode from `pseudocode.txt` and your done!
 
 # Example
+Below will be an example of how program works
 
+# Python
 ```py
 import random
 
@@ -39,7 +41,8 @@ random_number_fact()
 ```
 
 # Pseudocode
-```// Created by RealDL - @realdl on discord.
+```
+// Created by RealDL - @realdl on discord.
 
 import random
 
