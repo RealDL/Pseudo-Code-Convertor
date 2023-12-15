@@ -1,157 +1,584 @@
-# Imports for server modules
-from _thread import *
-from random import randint, choice
-import string, math, socket
-from Scripts.settings import Config
-from Scripts.encryption import *
-from Scripts.logger import *
+import pygame
+import webbrowser
+from logger import *
+logger.info("Pygame Functions 0.0.1 (Python 3.11.0)\nI am not affliated with pygame. https://github.com/TheRealDL1/pygame_functions")
 
-logger.debug("RealDL Server Code.")
+class Images(object):
+    def __init__(self, image):
+        self.image = image
+        self.screen = pygame.display.get_surface()
+        self.load_image = self.load_image_from_file(self.image)
+        self.rect = self.load_image.get_rect()
 
-class Server(Config):
-    def __init__(self):
+    def load_image_from_file(self, image):
         try:
-            Config.__init__(self)
-            self.initialize_server()
-        except ValueError as Error:
-            logger.error(f"Couldn't initialize server: {Error}") 
-
-    def initialize_server(self):
-        # Defines the server. 
-        # server is a string and port is an int.
-        self.server = self.SERVER
-        self.port = self.PORT
-        self.players = {}
-        self.connections = 0
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.rsa_keys = RSA_Keys(self.ENCRYPTION_DATA_SIZE)
-        self.public_key, self.private_key = self.rsa_keys.export_keys()
-        self.rsa_encrypt = RSA_Encryption(self.public_key)
-
-        try:
-            self.s.bind((self.server, self.port))
-        except socket.error as e:
-            logger.error(f"Socket Error: {e}")
-        self.s.listen()
-        logger.info("Waiting for connections, Server Started")
-        # self.s is the connection for the server.
-
-    def create_random_string(self):
-        # Creates a string of ascii letters and digits and randomly chooses 20
-        # to act an ID.
-        characters = string.ascii_letters + string.digits
-        return ''.join(choice(characters) for _ in range(self.ID_STRING_LENGTH))
-
-    def is_touching(self, x, y, other_x, other_y, threshold):
-        # Finds the distance between one player and another player.
-        # returns if they are not touching each other.
-        distance = math.sqrt((x + self.SQUARE_SIZE / 2 - other_x) ** 2 + (y + self.SQUARE_SIZE / 2 - other_y) ** 2)
-        sum_half_widths = sum_half_heights = (self.SQUARE_SIZE + threshold) / 2
-        return distance <= math.sqrt(sum_half_widths ** 2 + sum_half_heights ** 2)
-
-    def get_player_position(self):
-        # Generates a random position, checks that the position is valid before 
-        # creating player.
-        x, y = randint(256, 763), randint(256, 634)
-        while any(self.is_touching(x, y, p['x'], p['y'], self.SQUARE_SIZE) for p in self.players.values()):
-            x, y = randint(256, 763), randint(256, 634)
-        return x, y
-
-    def create_new_player(self, username):
-        # creates key_string/ ID, gets the player x and y then return player dictionary
-        key_string = self.create_random_string()
-        player_x, player_y = self.get_player_position()
-        return {
-            "x": player_x,
-            "y": player_y,
-            "image": "Graphics/Game/player.png",
-            "username": username,
-            "id": key_string
-        }, key_string
-
-    def handle_client_communication(self, conn, key_string, aes_encryption):
-        # This is a thread that connects to one client. Pulbic varibles (self)
-        # are shared and thus updated by all threads.
-        running = True
-        while running:
-            try:
-                # Receives the data from that client. it decrypts first. 
-                # then unserialises those decrypted bytes to get the player dictionary
-                data = aes_encryption.decrypt(self.unserialize(conn.recv(self.DATA_SIZE)))
-                self.players[key_string] = data
-                logger.info(f"Received Player Dict: {data}.")
-                # It updates the data for that player with that ID.
-                # Checks if no data was received. If none was received then
-                # this thread closes down.
-                if not data:
-                    logger.info(f"Player {key_string} disconnected.")
-                    running = False
-                else:
-                    # Otherwise, all the players dictionary is sent to all the players.
-                    reply = self.players
-                    encrypted_reply = self.serialize(aes_encryption.encrypt(reply))
-                # We send the encrypted response no matter what.
-                conn.sendall(encrypted_reply)
-                logger.info(f"Sending All Player Dict: {reply}.")
-            except:
-                logger.info(f"Player {key_string} lost connection.")
-                running = False
-
-        # When player has quit, that player with that ID is deleted and connections is reduced by one.
-        logger.info(f"Connection Closed for Player {key_string}.")
-        del self.players[key_string]
-        self.connections -= 1
-        conn.close()
-
-    def threaded_client(self, conn):
-        try:
-            # Send Public Key. We can send this unencrypted as it's public
-            data_to_send = self.serialize(self.public_key)
-            conn.send(data_to_send)
-            logger.info(f"Sending Public Key: {self.public_key}")
-
-            # Get AES Key and username. We decrypt them with the RSA private key.
-            dict_received_from_client = self.rsa_encrypt.decrypt(self.unserialize(conn.recv(self.ENCRYPTION_DATA_SIZE)),self.private_key)
-            aes_key = dict_received_from_client['aes_key']
-            username = dict_received_from_client['username']
-            logger.info(f"Received AES Key: {aes_key}")
-
-            # Create Player. Get a unique key string for that player.
-            new_player, key_string = self.create_new_player(username)
-            self.players[key_string] = new_player
+            return pygame.image.load(image).convert_alpha()
+        except pygame.error:
+            return pygame.image.load(f"../{image}").convert_alpha()
             
-            # Create AES Encryption and send player dict
-            # we serialises and encrypt the data to be sent using the AES key
-            aes_encryption = AES_Encryption(aes_key)
-            player_dict_send = {'player':new_player}
-            encrypted_player = aes_encryption.encrypt(self.serialize(player_dict_send))
-            conn.send(encrypted_player)
-            logger.info(f"Sending Player dict to client: {new_player}")
+    def display_icon(self):
+        pygame.display.set_icon(self.load_image)
 
-            # We then start the main game and run this.
-            # Conn has to be private it cant be self.conn as that will
-            # interfere if there is more than one players. key_string is only for 
-            # that player and aes_encryption is that same. So they must all be
-            # passed through and be private.
-            self.handle_client_communication(conn, key_string, aes_encryption)
+    def draw(self, x=0, y=0):
+        self.screen.blit(self.load_image, (x,y))
+
+    def resize(self, width, height):
+        self.load_image = pygame.transform.scale(self.load_image, (width, height))
+
+class Mouse:
+    def __init__(self,mouse_image1, mouse_image2, mouse_image3):
+        pygame.mouse.set_visible(False)
+        self.screen = pygame.display.get_surface()
+        self.mode = 0
+        self.mouse_mode1 = Images(mouse_image1)
+        self.mouse_mode2 = Images(mouse_image2)
+        self.mouse_mode3 = Images(mouse_image3)
+
+    def draw(self):
+        # Get the current mouse position
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        # Draw a green square at the mouse cursor position
+        if self.mode == 0:
+            self.mouse_mode1.draw(mouse_x , mouse_y)
+        elif self.mode == 1:
+            self.mouse_mode2.draw(mouse_x , mouse_y)
+        else:
+            self.mouse_mode3.draw(mouse_x , mouse_y)
+
+class WordButton(object):
+    def __init__(self, x, y, text, color1, color2,  basefont, largefont, textSize=30,):
+        """Sets the values for button"""
+        self.color = color1
+        self.color2 = color2
+        self.x = x
+        self.y = y
+        self.text = text
+        self.textSize = textSize
+        self.largeSize = round(self.textSize * 1.25)
+        self.basefont = basefont
+        self.largefont = largefont
+        try:
+            self.base_font = pygame.font.Font(self.basefont, self.textSize)
+            self.large_font = pygame.font.Font(self.largefont, self.largeSize)
         except:
-            logger.error("An Error Occurred trying to setup Client-Server connection.")
+            self.base_font = pygame.font.Font(f"../{self.basefont}", self.textSize)
+            self.large_font = pygame.font.Font(f"../{self.largefont}", self.largeSize)
+        self.hover = False
+        self.click = False
+        self.release = False
 
-    def run(self):
-        while True:
-            # try to find a connection
-            # addr is the server ip and the id of the client connected.
-            # conn is a sockets varible that has the server, port and addr
-            # EG: conn: <socket.socket fd=1592, family=2, type=1, proto=0, laddr=('192.168.0.223', 5555), raddr=('192.168.0.223', 50706)>
-            # EG: addr: ('192.168.0.223', 50706)
-            conn, addr = self.s.accept()
-            print(conn, addr)
-            self.connections += 1
-            logger.info(f"Connected to: {addr}")
-            logger.info(f"There are a total of {self.connections} connections!")
-            # We start a new thread with the conn. 
-            start_new_thread(self.threaded_client, (conn,))
+    def displayText(self, win, newText=None, action=None, link=None):
+        if newText != None:
+            self.text = newText
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
 
-if __name__ == "__main__":
-    server = Server()
-    server.run()
+        # Render text with both fonts
+        text = self.large_font.render(self.text, 1, self.color2)
+        text2 = self.base_font.render(self.text, 1, self.color)
+
+        # Check if mouse is over the text
+        if self.x + text.get_width()/2> mouse[0] > self.x - text.get_width()/2 and self.y + text.get_height()/2  > mouse[1] > self.y - text.get_height()/2:
+            self.hover = True
+            # Render text with larger font and lighter color
+            text = self.large_font.render(self.text, 1, self.color2)
+
+            # Center text vertically as well as horizontally
+            win.blit(text, (self.x - text.get_width() / 2, self.y - text.get_height() / 2))
+
+            # Check for mouse click and run action if specified
+            if click[0] == 1:
+                self.click = True
+            
+            if self.click == True and not click[0]:
+                self.release = True
+            
+            if self.release:
+                if action != None:
+                    action()
+                if link != None:
+                    webbrowser.open(link)
+                self.release = False
+                self.click = False
+        else:
+            self.hover = False
+            self.click = False
+            self.release = False
+            # Render text with base font and color
+            text2 = self.base_font.render(self.text, 1, self.color)
+
+            # Center text vertically as well as horizontally
+            win.blit(text2, (self.x - text2.get_width() / 2, self.y - text2.get_height() / 2))
+
+class Animation(object):
+    def __init__(self, image, scale, scale_direction, scale_min, scale_max, scale_speed, screen_y, screen_x):
+        self.scale = scale #1.0
+        self.image = image
+        self.scale_direction = scale_direction #-1.35  # Start by zooming out
+        self.scale_min = scale_min #0.9
+        self.scale_max = scale_max #1.2
+        self.scale_speed = scale_speed #0.01  # The rate at which the scale changes
+        self.screen_center_x = screen_x
+        self.screen_center_y = screen_y #324#win.get_height() // 2
+        self.monopoly_rect = self.image.get_rect(center=(self.screen_center_x, self.screen_center_y))
+
+    def animation(self, win):
+        self.scale += self.scale_direction * self.scale_speed
+        if self.scale <= self.scale_min:
+            if self.scale_direction < 0:
+                self.scale_direction = self.scale_direction * -1
+            else:
+                self.scale_direction = self.scale_direction * 1# Start zooming in
+        elif self.scale >= self.scale_max:
+            if self.scale_direction > 0:
+                self.scale_direction = self.scale_direction * -1
+            else:
+                self.scale_direction = self.scale_direction * 1  # Start zooming out
+
+        # Scale the image and get its rect
+        scaled_monopoly = pygame.transform.rotozoom(self.image, 0, self.scale)
+        scaled_monopoly_rect = scaled_monopoly.get_rect(center=(self.screen_center_x, self.screen_center_y))
+
+        # Blit the scaled image to the screen and update the display
+        win.blit(scaled_monopoly, scaled_monopoly_rect)
+
+class TextBox(object):
+    def __init__(self, width, height, x, y, color1, color2, textfont, curve, thickness, maxTextWidth):
+        self.text = ''
+        self.textSize = 60
+        self.textfont = textfont
+        self.base_font = pygame.font.Font(self.textfont, self.textSize)
+        self.active = False
+        self.width = width
+        self.height = height
+        self.x = x - self.width / 2
+        self.ogWidth = width
+        self.y = y
+        self.color_active = pygame.Color(color1)
+        self.color_passive = pygame.Color(color2)
+        self.color = self.color_passive
+        self.last_update = 0 # time of last update
+        self.show_cursor = False # whether to show cursor or not
+        self.cursor = 0
+        self.maxTextWidth = maxTextWidth
+        self.curve = curve
+        self.thickness = thickness
+    def draw(self, win):
+        area = [self.x,self.y,self.width,self.height]
+        pygame.draw.rect(win, self.color, area, self.thickness, self.curve)
+        
+    def checkTextBox(self):
+        mouse = pygame.mouse.get_pos()
+        
+        if self.x+self.width > mouse[0] > self.x and self.y+self.height > mouse[1] > self.y:
+            self.active = True
+        else:
+            self.active = False
+
+        if self.active:
+            self.color = self.color_active
+        else:
+            self.color = self.color_passive
+            
+    def update(self, win, x_pos=None, y_pos=None):
+        middleOfX = win.get_width() // 2
+        if x_pos is None:
+            x_pos = self.x
+        if y_pos is None:
+            y_pos = self.y
+        if self.text:
+            surface_area = self.base_font.render(self.text, True, (0, 0, 0))
+            text_width = surface_area.get_width() + 20
+            if self.ogWidth > self.width:
+                self.width = self.ogWidth
+                self.x = middleOfX - self.width // 2
+            if text_width > self.width:
+                self.width = text_width
+                self.x = middleOfX - self.width // 2
+            elif self.width > text_width:
+                if self.ogWidth < self.width:
+                    self.width = text_width
+                    self.x = middleOfX - self.width // 2
+            win.blit(surface_area, (x_pos + 5, y_pos + (self.height // 2 - surface_area.get_height() // 2)))
+        else:
+            self.width = self.ogWidth
+            self.x = middleOfX - self.width // 2
+            surface_area = self.base_font.render(self.text, True, (0, 0, 0))
+            win.blit(surface_area, (x_pos + 5, y_pos + (self.height // 2 - surface_area.get_height() // 2)))
+
+        time_since_last_update = pygame.time.get_ticks() - self.last_update
+        if self.active and time_since_last_update > 500:
+            self.show_cursor = not self.show_cursor
+            self.last_update = pygame.time.get_ticks()
+
+        if self.show_cursor and self.active == True:
+            cursor_width = 2
+            cursor_pos = self.base_font.size(self.text[:self.cursor])[0] - 5
+            text_to_show = self.text[:self.cursor] + '|' + self.text[self.cursor:]
+            cursor_pos += self.base_font.size(' ')[0] * 0.8
+            surface_area = self.base_font.render(text_to_show, True, (0, 0, 0))
+            cursor_area = pygame.Surface((cursor_width, surface_area.get_height()))
+            cursor_area.fill((0, 0, 0))
+            win.blit(cursor_area, (x_pos + cursor_pos, y_pos + (self.height // 2 - cursor_area.get_height() // 2)), (0, 0, cursor_width, cursor_area.get_height()))
+        else:
+            surface_area = self.base_font.render(self.text, True, (0, 0, 0))
+            win.blit(surface_area, (x_pos + 5, y_pos + (self.height // 2 - surface_area.get_height() // 2)))
+
+    def updateText(self, events, function):
+        surface_area = self.base_font.render(self.text, True, (0, 0, 0))
+        text_width = surface_area.get_width() + 20
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.checkTextBox()
+            if event.type == pygame.KEYDOWN:
+                if self.active == True:
+                    if event.key == pygame.K_BACKSPACE:
+                        if self.cursor > 0:
+                            self.text = self.text[:self.cursor-1] + self.text[self.cursor:]
+                            self.cursor -= 1
+                    elif event.key == pygame.K_DELETE:
+                        self.text = self.text[:self.cursor] + self.text[self.cursor+1:]
+                    elif event.key == pygame.K_RETURN:
+                        if function != None:
+                            function()
+                    elif event.key == pygame.K_LEFT:
+                        if self.cursor > 0:
+                            self.cursor -= 1
+                    elif event.key == pygame.K_RIGHT:
+                        if self.cursor < len(self.text):
+                            self.cursor += 1
+                    else:
+                        if text_width < self.maxTextWidth:
+                            self.text = self.text[:self.cursor] + event.unicode + self.text[self.cursor:]
+                            self.cursor += 1     
+
+class Text(object):
+    def __init__(self, height, baseFont, color=(0,0,0), x=None, y=None, text=None, textSize=32):
+        self.text = text
+        self.x = x
+        self.y = y
+        self.baseFont = baseFont
+        self.height = height
+        self.textSize = textSize
+        self.color = color
+        self.screen = pygame.display.get_surface()
+        self.base_font = pygame.font.Font(self.baseFont, self.textSize)
+
+        # Animation
+        self.stop_start_animation = True
+        self.animation_time = 150
+        self.animation_speed = 13
+        self.num_frames = 60
+        self.time = 0
+        self.time2 = 0
+
+        # Opacity
+        self.opacitya = 0
+        self.opacityb = 255
+        self.opacity_color1 = 0
+        self.opacity_color2 = 0
+        self.opacity_color = 0
+
+    def draw(self, mode="draw",new_text=None, new_x=None, new_y=None):
+        if new_text: self.text = new_text
+        if new_x: self.x = new_x
+        if new_y: self.y = new_y
+
+        if mode == "draw":
+            self.stop_start_animation = False
+            self.time = pygame.time.get_ticks()
+            step = (self.time - self.time2) / (self.animation_time / self.animation_speed)
+            self.opacity_color1 = self.change_opacity(self.opacity_color2, self.opacityb, step)
+            self.opacity_color = self.opacity_color1
+
+        if mode == "undraw":
+            self.time2 = pygame.time.get_ticks()
+            step = (self.time2 - self.time) / (self.animation_time / self.animation_speed)
+            self.opacity_color2 = self.change_opacity(self.opacity_color1, self.opacitya, step)
+            self.opacity_color = self.opacity_color2
+        
+        if not self.stop_start_animation:
+            surface_area = self.base_font.render(self.text, 1, self.color)
+            surface_area.set_alpha(self.opacity_color)
+            self.screen.blit(surface_area, (self.x - surface_area.get_width() / 2, self.y - surface_area.get_height() / 2))
+    
+    def change_opacity(self, original_opacity, new_opacity, step_multiplier=0):
+        new_opacity_return = None
+        difference = new_opacity - original_opacity
+        opacity_step = difference / self.num_frames
+        if original_opacity > new_opacity:
+            if int(original_opacity + opacity_step*step_multiplier) < new_opacity:
+                new_opacity_return = new_opacity
+            else:
+                new_opacity_return = int(original_opacity + opacity_step*step_multiplier)
+        else:
+            if int(original_opacity + opacity_step*step_multiplier) > new_opacity:
+              new_opacity_return = new_opacity
+            else:
+                new_opacity_return = int(original_opacity + opacity_step*step_multiplier)
+                
+        return new_opacity_return
+
+class Button():
+    """A class for all buttons"""
+    def __init__(self, color, color2, x, y, basefont, text_color=(0,0,0), text_color2=(0,0,0), width=None, height=None, text='',buttonType='Rectangle', radius=None, textSize=30, curve=20, image=""):
+        """Sets the values for buttton"""
+        self.screen = pygame.display.get_surface()
+        try:
+            self.x = x - width/2
+            self.y = y - height/2
+            self.width = width
+            self.height = height
+        except:
+            self.x = x
+            self.y = y
+
+        if image != "":
+            self.image = Images(image)
+            if height and width:
+                self.image.resize(width,height)
+        self.text = text
+        self.buttonType = buttonType
+        self.radius = radius
+        self.textSize = textSize
+        self.curve = curve
+        #Mouse clicking
+        self.hover = False
+        self.click = False
+        self.release = False
+        # Animation
+        self.stop_start_animation = True
+        self.animation_time = 150
+        self.animation_speed = 13
+        self.num_frames = 60
+        self.time = 0
+        self.time2 = 0
+        # Colors
+        self.color = color
+        self.color2 = color2
+        self.text_color = text_color
+        self.text_color2 = text_color2
+        self.text_trans_color = self.text_color
+        self.button_trans_color = self.color
+        self.text_trans_color2 = self.text_color
+        self.button_trans_color2 = self.color
+        # Opacity
+        self.opacitya = 255
+        self.opacityb = 180
+        self.opacity1 = 255
+        self.opacity2 = 180
+        # Fonts
+        self.basefont = basefont
+        self.base_font = pygame.font.SysFont(self.basefont, self.textSize)
+    
+    def draw(self,outline=None,action=None, link=None, colorChange=True, newText=None, newX=None, newY=None):
+        """New X, Y and Text values"""
+        if newText:
+            self.text = newText
+        if newX:
+            self.x = newX
+        if newY:
+            self.y = newY
+        """Draws the button. Variable for mouse detection"""
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
+        if self.buttonType == "Rectangle":
+            """If it is a rectangle it will draw it here"""
+            if outline:
+                """draws an outline"""
+                pygame.draw.rect(self.screen, outline, (self.x-2,self.y-2,self.width+4,self.height+4),0,self.curve)
+            if self.x+self.width > mouse[0] > self.x and self.y+self.height > mouse[1] > self.y and colorChange:
+                self.hover = True
+                self.stop_start_animation = False
+                self.time2 = pygame.time.get_ticks()
+                step = (self.time2 - self.time) / (self.animation_time / self.animation_speed)
+                """Draws a lighter version of the image"""
+                self.button_trans_color = self.change_color(self.button_trans_color2, self.color2, step)
+                pygame.draw.rect(self.screen, self.button_trans_color, (self.x,self.y,self.width,self.height), 0, self.curve)
+                if self.text != '':
+                    self.text_trans_color = self.change_color(self.text_trans_color2, self.text_color2, step)
+                    text = self.base_font.render(self.text, 1, self.text_trans_color)
+                    self.screen.blit(text, (self.x + (self.width/2 - text.get_width()/2), self.y + (self.height/2 - text.get_height()/2)))
+
+                # Clicking the Button
+                if click[0] == 1:
+                    self.click = True
+
+                if self.click == True and not click[0]:
+                    self.release = True
+
+                if self.release:
+                    """If there is an action it is run"""
+                    if action != None:
+                        action()
+                    if link != None:
+                        webbrowser.open(link)
+                    self.release = False
+                    self.click = False
+   
+            else:
+                self.time = pygame.time.get_ticks()
+                self.hover = False
+                self.click = False
+                self.release = False
+                step = (self.time - self.time2) / (self.animation_time / self.animation_speed)
+                """A darker version of image when the player isn't hovering over"""
+                if not self.stop_start_animation:
+                    self.button_trans_color2 = self.change_color(self.button_trans_color, self.color, step)
+                    pygame.draw.rect(self.screen, self.button_trans_color2, (self.x,self.y,self.width,self.height),0, self.curve)
+                else:
+                    pygame.draw.rect(self.screen, self.color, (self.x,self.y,self.width,self.height),0, self.curve)
+                if self.text != '':
+                    """Text is blit here"""
+                    if not self.stop_start_animation:
+                        self.text_trans_color2 = self.change_color(self.text_trans_color, self.text_color, step)
+                        text = self.base_font.render(self.text, 1, self.text_trans_color2)
+                    else:
+                        text = self.base_font.render(self.text, 1, self.text_color)
+                    self.screen.blit(text, (self.x + (self.width/2 - text.get_width()/2), self.y + (self.height/2 - text.get_height()/2)))           
+
+        if self.buttonType == "Circle":
+            """If it is a circle it will draw it here"""
+            if outline:
+                """draws an outline"""
+                pygame.draw.circle(self.screen, outline, (self.x, self.y),self.radius+2.5,0)
+            """Trig for area"""
+            differenceInX = mouse[0] - self.x
+            differenceInY = mouse[1] - self.y
+            difference = ( differenceInX**2 + differenceInY**2 )**0.5
+            """Info on the circle"""
+            if difference <= self.radius:
+                self.hover = True
+                self.stop_start_animation = False
+                self.time2 = pygame.time.get_ticks()
+                step = (self.time2 - self.time) / (self.animation_time / self.animation_speed)
+                self.button_trans_color = self.change_color(self.button_trans_color2, self.color2, step)
+                """Draws a lighter version of the image"""
+                pygame.draw.circle(self.screen, self.button_trans_color, (self.x,self.y),self.radius,0)
+
+                if self.text != '':
+                    """Text is blit here"""
+                    self.text_trans_color = self.change_color(self.text_trans_color2, self.text_color2, step)
+                    text = self.base_font.render(self.text, 1, self.text_trans_color)
+                    self.screen.blit(text, (self.x - (text.get_width()/2), self.y - (text.get_height()/2)))
+      
+                # Clicking the Button
+                if click[0] == 1:
+                    self.click = True
+
+                if self.click == True and not click[0]:
+                    self.release = True
+
+                if self.release:
+                    """If there is an action it is run"""
+                    if action != None:
+                        action()
+                    if link != None:
+                        webbrowser.open(link)
+                    self.release = False
+                    self.click = False
+            else:
+                self.time = pygame.time.get_ticks()
+                step = (self.time - self.time2) / (self.animation_time / self.animation_speed)
+                self.button_trans_color2 = self.change_color(self.button_trans_color, self.color, step)
+                self.hover = False
+                self.click = False
+                self.release = False
+                """A darker version of image when the player isn't hovering over"""
+                pygame.draw.circle(self.screen, self.button_trans_color2, (self.x,self.y),self.radius,0)
+
+                if self.text != '':
+                    """Text is blit here"""
+                    self.text_trans_color2 = self.change_color(self.text_trans_color, self.text_color, step)
+                    text = self.base_font.render(self.text, 1, self.text_trans_color2)
+                    self.screen.blit(text, (self.x - (text.get_width()/2), self.y - (text.get_height()/2)))
+                
+        if self.buttonType == "Image":
+            if outline:
+                """draws an outline"""
+                pygame.draw.rect(self.screen, outline, (self.x-3,self.y-3,self.width+6,self.height+6),0,self.curve)
+
+            self.image.draw(self.x,self.y)
+            
+            if self.x+self.width > mouse[0] > self.x and self.y+self.height > mouse[1] > self.y:
+                self.time2 = pygame.time.get_ticks()
+                step = (self.time2 - self.time) / (self.animation_time / self.animation_speed)
+                self.opacity2 = self.change_opacity(self.opacity1, self.opacityb, step)
+                self.image.load_image.set_alpha(self.opacity2)
+                self.hover = True
+                # Clicking the Button
+                if click[0] == 1:
+                    self.click = True
+
+                if self.click == True and not click[0]:
+                    self.release = True
+
+                if self.release:
+                    """If there is an action it is run"""
+                    if action != None:
+                        action()
+                    if link != None:
+                        webbrowser.open(link)
+                    self.release = False
+                    self.click = False
+            else:
+                self.time = pygame.time.get_ticks()
+                self.hover = False
+                self.click = False
+                self.release = False
+                step = (self.time - self.time2) / (self.animation_time / self.animation_speed)
+                self.opacity1 = self.change_opacity(self.opacity2, self.opacitya, step)
+                self.image.load_image.set_alpha(self.opacity1)
+    
+    def is_hovered(self):
+        if self.hover:
+            return True
+        else:
+            return False
+
+    def is_clicking(self):
+        if self.click:
+            return True
+        else:
+            return False
+
+    def change_color(self, original_color, new_color, step_multiplier=0):
+        colors = []
+        new_color_list = []
+        for rgb1, rgb2 in zip(original_color, new_color):
+            difference = rgb2 - rgb1
+            colors.append(difference)
+
+        color_step = [difference / self.num_frames for difference in colors]
+
+        for og_color_rgb, new_color_rgb, step in zip(original_color, new_color, color_step):
+            if og_color_rgb > new_color_rgb:
+                if int(og_color_rgb + step_multiplier*step) < new_color_rgb:
+                    new_color_list.append(new_color_rgb)
+                else:
+                    new_color_list.append(int(og_color_rgb + step_multiplier*step))
+            else:
+                if int(og_color_rgb + step_multiplier*step) > new_color_rgb:
+                    new_color_list.append(new_color_rgb)
+                else:
+                    new_color_list.append(int(og_color_rgb + step_multiplier*step))
+
+        return tuple(new_color_list)
+    
+    def change_opacity(self, original_opacity, new_opacity, step_multiplier=0):
+        new_opacity_return = None
+        difference = new_opacity - original_opacity
+        opacity_step = difference / self.num_frames
+        if original_opacity > new_opacity:
+            if int(original_opacity + opacity_step*step_multiplier) < new_opacity:
+                new_opacity_return = new_opacity
+            else:
+                new_opacity_return = int(original_opacity + opacity_step*step_multiplier)
+        else:
+            if int(original_opacity + opacity_step*step_multiplier) > new_opacity:
+              new_opacity_return = new_opacity
+            else:
+                new_opacity_return = int(original_opacity + opacity_step*step_multiplier)
+                
+        return new_opacity_return
