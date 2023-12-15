@@ -1,0 +1,796 @@
+// Created by RealDL - @realdl on discord.
+
+import pygame
+import webbrowser
+from logger import *
+
+logger.info("Pygame Functions 0.0.1 (Python 3.11.0)\nI am NOT affliated with pygame. https://github.com/TheRealDL1/pygame_functions")
+
+class Images inherits object
+    private rect
+    private load_image
+    private screen
+    private image
+
+    public procedure new(image)
+        image = image
+        screen = new pygame.display.get_surface()
+        load_image = new load_image_from_file(image)
+        rect = new load_image.get_rect()
+    endprocedure
+
+    function load_image_from_file(image)
+        try
+            return pygame.image.load(image).convert_alpha()
+        except pygame.error
+            return pygame.image.load(f"../{image}").convert_alpha()
+        endtry
+    endfunction
+
+    public procedure display_icon()
+        pygame.display.set_icon(load_image)
+    endprocedure
+
+    public procedure draw(x= new 0, y= new 0)
+        screen.blit(load_image, (x,y))
+    endprocedure
+
+    public procedure resize(width, height)
+        load_image = new pygame.transform.scale(load_image, (width, height))
+    endprocedure
+
+class Mouse
+    private mouse_mode3
+    private mouse_mode2
+    private mouse_mode1
+    private mode
+    private screen
+
+    public procedure new(mouse_image1, mouse_image2, mouse_image3)
+        pygame.mouse.set_visible(False)
+        screen = new pygame.display.get_surface()
+        mode = 0
+        mouse_mode1 = new Images(mouse_image1)
+        mouse_mode2 = new Images(mouse_image2)
+        mouse_mode3 = new Images(mouse_image3)
+    endprocedure
+
+    public procedure draw()
+        // Get the current mouse position
+        mouse_x, mouse_y = new pygame.mouse.get_pos()
+        // Draw a green square at the mouse cursor position
+        if mode == 0 then
+            mouse_mode1.draw(mouse_x , mouse_y)
+        endif
+        elseif mode == 1 then
+            mouse_mode2.draw(mouse_x , mouse_y)
+         else
+            mouse_mode3.draw(mouse_x , mouse_y)
+        endif
+    endprocedure
+
+
+class WordButton inherits object
+    private release
+    private click
+    private hover
+    private large_font
+    private base_font
+    private largefont
+    private basefont
+    private largeSize
+    private textSize
+    private text
+    private y
+    private x
+    private color2
+    private color
+
+    public procedure new(x, y, text, color1, color2,  basefont, largefont, textSize= new 30,)
+        //Sets the values for button//
+        color = color1
+        color2 = color2
+        x = x
+        y = y
+        text = text
+        textSize = textSize
+        largeSize = new round(textSize * 1.25)
+        basefont = basefont
+        largefont = largefont
+        try
+            base_font = new pygame.font.Font(basefont, textSize)
+            large_font = new pygame.font.Font(largefont, largeSize)
+        except
+            base_font = new pygame.font.Font(f"../{basefont}", textSize)
+            large_font = new pygame.font.Font(f"../{largefont}", largeSize)
+        endtry
+        hover = False
+        click = False
+        release = False
+    endprocedure
+
+    public procedure displayText(win, newText= new None, action= new None, link= new None)
+        if newText != None then
+            text = newText
+        endif
+        mouse = new pygame.mouse.get_pos()
+        click = new pygame.mouse.get_pressed()
+        // Render text with both fonts
+        text = new large_font.render(text, 1, color2)
+        text2 = new base_font.render(text, 1, color)
+        // Check if mouse is over the text
+        if x + text.get_width()/2> mouse[0] > x - text.get_width()/2 AND y + text.get_height()/2  > mouse[1] > y - text.get_height()/2 then
+            hover = True
+            // Render text with larger font and lighter color
+            text = new large_font.render(text, 1, color2)
+            // Center text vertically as well as horizontally
+            win.blit(text, (x - text.get_width() / 2, y - text.get_height() / 2))
+            // Check for mouse click and run action if specified
+            if click[0] == 1 then
+                click = True
+            endif
+            if click == True AND NOT click[0] then
+                release = True
+            endif
+            if release then
+                if action != None then
+                    action()
+                endif
+                if link != None then
+                    webbrowser.openWriteRead(link)
+                endif
+                release = False
+                click = False
+         else
+            endif
+            hover = False
+            click = False
+            release = False
+            // Render text with base font and color
+            text2 = new base_font.render(text, 1, color)
+            // Center text vertically as well as horizontally
+            win.blit(text2, (x - text2.get_width() / 2, y - text2.get_height() / 2))
+        endif
+    endprocedure
+
+
+class Animation inherits object
+    private monopoly_rect
+    private screen_center_y
+    private screen_center_x
+    private scale_speed
+    private scale_max
+    private scale_min
+    private scale_direction
+    private image
+    private scale
+
+    public procedure new(image, scale, scale_direction, scale_min, scale_max, scale_speed, screen_y, screen_x)
+        scale = scale //1.0
+        image = image
+        scale_direction = scale_direction //-1.35  // Start by zooming out
+        scale_min = scale_min //0.9
+        scale_max = scale_max //1.2
+        scale_speed = scale_speed //0.01  // The rate at which the scale changes
+        screen_center_x = screen_x
+        screen_center_y = new screen_y //324//win.get_height() // 2
+        monopoly_rect = new image.get_rect(center= new(screen_center_x, screen_center_y))
+    endprocedure
+
+    public procedure animation(win)
+        scale += scale_direction * scale_speed
+        if scale <= scale_min then
+            if scale_direction < 0 then
+                scale_direction = scale_direction * -1
+             else
+                scale_direction = scale_direction * 1// Start zooming in
+            endif
+        endif
+        elseif scale >= scale_max then
+            if scale_direction > 0 then
+                scale_direction = scale_direction * -1
+             else
+                scale_direction = scale_direction * 1  // Start zooming out
+            endif
+        endif
+        // Scale the image and get its rect
+        scaled_monopoly = new pygame.transform.rotozoom(image, 0, scale)
+        scaled_monopoly_rect = new scaled_monopoly.get_rect(center= new(screen_center_x, screen_center_y))
+        // Blit the scaled image to the screen and update the display
+        win.blit(scaled_monopoly, scaled_monopoly_rect)
+    endprocedure
+
+
+class TextBox inherits object
+    private show_cursor
+    private thickness
+    private curve
+    private maxTextWidth
+    private cursor
+    private show_cursOR
+    private last_update
+    private color
+    private color_passive
+    private color_active
+    private y
+    private ogWidth
+    private x
+    private height
+    private width
+    private active
+    private base_font
+    private textfont
+    private textSize
+    private text
+
+    public procedure new(width, height, x, y, color1, color2, textfont, curve, thickness, maxTextWidth)
+        text = ''
+        textSize = 60
+        textfont = textfont
+        base_font = new pygame.font.Font(textfont, textSize)
+        active = False
+        width = width
+        height = height
+        x = x - width / 2
+        ogWidth = width
+        y = y
+        color_active = new pygame.Color(color1)
+        color_passive = new pygame.Color(color2)
+        color = color_passive
+        last_update = 0 // time of last update
+        show_cursOR = False // whether to show cursOR OR not
+        cursor = 0
+        maxTextWidth = maxTextWidth
+        curve = curve
+        thickness = thickness
+    endprocedure
+
+    public procedure draw(win)
+        area = [x,y,width,height]
+        pygame.draw.rect(win, color, area, thickness, curve)
+    endprocedure
+
+    public procedure checkTextBox()
+        mouse = new pygame.mouse.get_pos()
+        if x+width > mouse[0] > x AND y+height > mouse[1] > y then
+            active = True
+         else
+            active = False
+        endif
+        if active then
+            color = color_active
+         else
+            color = color_passive
+        endif
+    endprocedure
+
+    public procedure update(win, x_pos= new None, y_pos= new None)
+        middleOfX = new win.get_width() // 2
+        if x_pos is None then
+            x_pos = x
+        endif
+        if y_pos is None then
+            y_pos = y
+        endif
+        if text then
+            surface_area = new base_font.render(text, True, (0, 0, 0))
+            text_width = new surface_area.get_width() + 20
+            if ogWidth > width then
+                width = ogWidth
+                x = middleOfX - width // 2
+            endif
+            if text_width > width then
+                width = text_width
+                x = middleOfX - width // 2
+            endif
+            elseif width > text_width then
+                if ogWidth < width then
+                    width = text_width
+                    x = middleOfX - width // 2
+                endif
+            endif
+            win.blit(surface_area, (x_pos + 5, y_pos + (height // 2 - surface_area.get_height() // 2)))
+         else
+            width = ogWidth
+            x = middleOfX - width // 2
+            surface_area = new base_font.render(text, True, (0, 0, 0))
+            win.blit(surface_area, (x_pos + 5, y_pos + (height // 2 - surface_area.get_height() // 2)))
+        endif
+        time_since_last_update = new pygame.time.get_ticks() - last_update
+        if active AND time_since_last_update > 500 then
+            show_cursor = NOT show_cursor
+            last_update = new pygame.time.get_ticks()
+        endif
+        if show_cursor AND active == True then
+            cursor_width = 2
+            cursor_pos = new base_font.size(text[:cursor])[0] - 5
+            text_to_show = text[:cursor] + '|' + text[cursor:]
+            cursor_pos += new base_font.size(' ')[0] * 0.8
+            surface_area = new base_font.render(text_to_show, True, (0, 0, 0))
+            cursor_area = new pygame.Surface((cursor_width, surface_area.get_height()))
+            cursor_area.fill((0, 0, 0))
+            win.blit(cursor_area, (x_pos + cursor_pos, y_pos + (height // 2 - cursor_area.get_height() // 2)), (0, 0, cursor_width, cursor_area.get_height()))
+         else
+            surface_area = new base_font.render(text, True, (0, 0, 0))
+            win.blit(surface_area, (x_pos + 5, y_pos + (height // 2 - surface_area.get_height() // 2)))
+        endif
+    endprocedure
+
+    public procedure updateText(events, function)
+        surface_area = new base_font.render(text, True, (0, 0, 0))
+        text_width = new surface_area.get_width() + 20
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN then
+                checkTextBox()
+            endif
+            if event.type == pygame.KEYDOWN then
+                if active == True then
+                    if event.key == pygame.K_BACKSPACE then
+                        if cursor > 0 then
+                            text = text[:cursor-1] + text[cursor:]
+                            cursor -= 1
+                        endif
+                    endif
+                    elseif event.key == pygame.K_DELETE then
+                        text = text[:cursor] + text[cursor+1:]
+                    endif
+                    elseif event.key == pygame.K_RETURN then
+                        if function != None then
+                            function()
+                        endif
+                    endif
+                    elseif event.key == pygame.K_LEFT then
+                        if cursor > 0 then
+                            cursor -= 1
+                        endif
+                    endif
+                    elseif event.key == pygame.K_RIGHT then
+                        if cursor < len(text) then
+                            cursor += 1
+                     else
+                        endif
+                        if text_width < maxTextWidth then
+                            text = text[:cursor] + event.unicode + text[cursor:]
+                            cursor += 1     
+                        endif
+                    endif
+                endif
+            endif
+    endprocedure
+
+
+class Text inherits object
+    private opacity_color
+    private opacity_color2
+    private opacity_color1
+    private opacityb
+    private opacitya
+    private time2
+    private time
+    private num_frames
+    private animation_speed
+    private animation_time
+    private stop_start_animation
+    private base_font
+    private screen
+    private color
+    private textSize
+    private height
+    private baseFont
+    private y
+    private x
+    private text
+
+    public procedure new(height, baseFont, color= new (0,0,0), x= new None, y= new None, text= new None, textSize= new 32)
+        text = text
+        x = x
+        y = y
+        baseFont = baseFont
+        height = height
+        textSize = textSize
+        color = color
+        screen = new pygame.display.get_surface()
+        base_font = new pygame.font.Font(baseFont, textSize)
+        // Animation
+        stop_start_animation = True
+        animation_time = 150
+        animation_speed = 13
+        num_frames = 60
+        time = 0
+        time2 = 0
+        // Opacity
+        opacitya = 0
+        opacityb = 255
+        opacity_color1 = 0
+        opacity_color2 = 0
+        opacity_color = 0
+    endprocedure
+
+    public procedure draw(mode= new "draw",new_text= new None, new_x= new None, new_y= new None)
+        if new_text then text = new_text
+        endif
+        if new_x then x = new_x
+        endif
+        if new_y then y = new_y
+        endif
+        if mode == "draw" then
+            stop_start_animation = False
+            time = new pygame.time.get_ticks()
+            step = new (time - time2) / (animation_time / animation_speed)
+            opacity_color1 = new change_opacity(opacity_color2, opacityb, step)
+            opacity_color = opacity_color1
+        endif
+        if mode == "undraw" then
+            time2 = new pygame.time.get_ticks()
+            step = new (time2 - time) / (animation_time / animation_speed)
+            opacity_color2 = new change_opacity(opacity_color1, opacitya, step)
+            opacity_color = opacity_color2
+        endif
+        if NOT stop_start_animation then
+            surface_area = new base_font.render(text, 1, color)
+            surface_area.set_alpha(opacity_color)
+            screen.blit(surface_area, (x - surface_area.get_width() / 2, y - surface_area.get_height() / 2))
+        endif
+    endprocedure
+
+    function change_opacity(original_opacity, new_opacity, step_multiplier= new 0)
+        new_opacity_return = None
+        difference = new_opacity - original_opacity
+        endif
+        opacity_step = difference / num_frames
+        endif
+        if original_opacity > new_opacity then
+            if int(original_opacity + opacity_step*step_multiplier) < new_opacity then
+                new_opacity_return = new_opacity
+             else
+                new_opacity_return = new int(original_opacity + opacity_step*step_multiplier)
+         else
+            endif
+            if int(original_opacity + opacity_step*step_multiplier) > new_opacity then
+              new_opacity_return = new_opacity
+             else
+                new_opacity_return = new int(original_opacity + opacity_step*step_multiplier)
+            endif
+        endif
+        return new_opacity_return
+    endfunction
+
+
+class Button
+    private base_font
+    private basefont
+    private opacity2
+    private opacity1
+    private opacityb
+    private opacitya
+    private button_trans_color2
+    private text_trans_color2
+    private button_trans_color
+    private text_trans_color
+    private text_color2
+    private text_color
+    private color2
+    private color
+    private time2
+    private time
+    private num_frames
+    private animation_speed
+    private animation_time
+    private stop_start_animation
+    private release
+    private click
+    private hover
+    private curve
+    private textSize
+    private radius
+    private buttonType
+    private text
+    private image
+    private height
+    private width
+    private y
+    private x
+    private screen
+
+    //A class for all buttons//
+    public procedure new(color, color2, x, y, basefont, text_color= new (0,0,0), text_color2= new (0,0,0), width= new None, height= new None, text= new '',buttonType= new 'Rectangle', radius= new None, textSize= new 30, curve= new 20, image= new "")
+        //Sets the values for buttton//
+        screen = new pygame.display.get_surface()
+        try
+            x = x - width/2
+            y = y - height/2
+            width = width
+            height = height
+        except
+            x = x
+            y = y
+        endtry
+        if image != "" then
+            image = new Images(image)
+            if height AND width then
+                image.resize(width,height)
+            endif
+        endif
+        text = text
+        buttonType = buttonType
+        radius = radius
+        textSize = textSize
+        curve = curve
+        //Mouse clicking
+        hover = False
+        click = False
+        release = False
+        // Animation
+        stop_start_animation = True
+        animation_time = 150
+        animation_speed = 13
+        num_frames = 60
+        time = 0
+        time2 = 0
+        // Colors
+        color = color
+        color2 = color2
+        text_color = text_color
+        text_color2 = text_color2
+        text_trans_color = text_color
+        button_trans_color = color
+        text_trans_color2 = text_color
+        button_trans_color2 = color
+        // Opacity
+        opacitya = 255
+        opacityb = 180
+        opacity1 = 255
+        opacity2 = 180
+        // Fonts
+        basefont = basefont
+        base_font = new pygame.font.SysFont(basefont, textSize)
+    endprocedure
+
+    public procedure draw(outline= new None,action= new None, link= new None, colorChange= new True, newText= new None, newX= new None, newY= new None)
+        //New X, Y and Text values//
+        if newText then
+            text = newText
+        endif
+        if newX then
+            x = newX
+        endif
+        if newY then
+            y = newY
+        endif
+        //Draws the button. Variable for mouse detection//
+        mouse = new pygame.mouse.get_pos()
+        click = new pygame.mouse.get_pressed()
+        if buttonType == "Rectangle" then
+            //If it is a rectangle it will draw it here//
+            if outline then
+                //draws an outline//
+                pygame.draw.rect(screen, outline, (x-2,y-2,width+4,height+4),0,curve)
+            endif
+            if x+width > mouse[0] > x AND y+height > mouse[1] > y AND colorChange then
+                hover = True
+                stop_start_animation = False
+                time2 = new pygame.time.get_ticks()
+                step = new (time2 - time) / (animation_time / animation_speed)
+                //Draws a lighter version of the image//
+                button_trans_color = new change_color(button_trans_color2, color2, step)
+                pygame.draw.rect(screen, button_trans_color, (x,y,width,height), 0, curve)
+                if text != '' then
+                    text_trans_color = new change_color(text_trans_color2, text_color2, step)
+                    text = new base_font.render(text, 1, text_trans_color)
+                    screen.blit(text, (x + (width/2 - text.get_width()/2), y + (height/2 - text.get_height()/2)))
+                endif
+                // Clicking the Button
+                if click[0] == 1 then
+                    click = True
+                endif
+                if click == True AND NOT click[0] then
+                    release = True
+                endif
+                if release then
+                    //If there is an action it is run//
+                    if action != None then
+                        action()
+                    endif
+                    if link != None then
+                        webbrowser.openWriteRead(link)
+                    endif
+                    release = False
+                    click = False
+             else
+                endif
+                time = new pygame.time.get_ticks()
+                hover = False
+                click = False
+                release = False
+                step = new (time - time2) / (animation_time / animation_speed)
+                //A darker version of image when the player isn't hovering over//
+                if NOT stop_start_animation then
+                    button_trans_color2 = new change_color(button_trans_color, color, step)
+                    pygame.draw.rect(screen, button_trans_color2, (x,y,width,height),0, curve)
+                 else
+                    pygame.draw.rect(screen, color, (x,y,width,height),0, curve)
+                endif
+                if text != '' then
+                    //Text is blit here//
+                    if NOT stop_start_animation then
+                        text_trans_color2 = new change_color(text_trans_color, text_color, step)
+                        text = new base_font.render(text, 1, text_trans_color2)
+                     else
+                        text = new base_font.render(text, 1, text_color)
+                    endif
+                    screen.blit(text, (x + (width/2 - text.get_width()/2), y + (height/2 - text.get_height()/2)))           
+                endif
+            endif
+        endif
+        if buttonType == "Circle" then
+            //If it is a circle it will draw it here//
+            if outline then
+                //draws an outline//
+                pygame.draw.circle(screen, outline, (x, y),radius+2.5,0)
+            endif
+            //Trig for area//
+            differenceInX = mouse[0] - x
+            endif
+            differenceInY = mouse[1] - y
+            endif
+            difference = new ( differenceInX**2 + differenceInY**2 )**0.5
+            endif
+            //Info on the circle//
+            if difference <= radius then
+                hover = True
+                stop_start_animation = False
+                time2 = new pygame.time.get_ticks()
+                step = new (time2 - time) / (animation_time / animation_speed)
+                button_trans_color = new change_color(button_trans_color2, color2, step)
+                //Draws a lighter version of the image//
+                pygame.draw.circle(screen, button_trans_color, (x,y),radius,0)
+                if text != '' then
+                    //Text is blit here//
+                    text_trans_color = new change_color(text_trans_color2, text_color2, step)
+                    text = new base_font.render(text, 1, text_trans_color)
+                    screen.blit(text, (x - (text.get_width()/2), y - (text.get_height()/2)))
+                endif
+                // Clicking the Button
+                if click[0] == 1 then
+                    click = True
+                endif
+                if click == True AND NOT click[0] then
+                    release = True
+                endif
+                if release then
+                    //If there is an action it is run//
+                    if action != None then
+                        action()
+                    endif
+                    if link != None then
+                        webbrowser.openWriteRead(link)
+                    endif
+                    release = False
+                    click = False
+             else
+                endif
+                time = new pygame.time.get_ticks()
+                step = new (time - time2) / (animation_time / animation_speed)
+                button_trans_color2 = new change_color(button_trans_color, color, step)
+                hover = False
+                click = False
+                release = False
+                //A darker version of image when the player isn't hovering over//
+                pygame.draw.circle(screen, button_trans_color2, (x,y),radius,0)
+                if text != '' then
+                    //Text is blit here//
+                    text_trans_color2 = new change_color(text_trans_color, text_color, step)
+                    text = new base_font.render(text, 1, text_trans_color2)
+                    screen.blit(text, (x - (text.get_width()/2), y - (text.get_height()/2)))
+                endif
+            endif
+        endif
+        if buttonType == "Image" then
+            if outline then
+                //draws an outline//
+                pygame.draw.rect(screen, outline, (x-3,y-3,width+6,height+6),0,curve)
+            endif
+            image.draw(x,y)
+            if x+width > mouse[0] > x AND y+height > mouse[1] > y then
+                time2 = new pygame.time.get_ticks()
+                step = new (time2 - time) / (animation_time / animation_speed)
+                opacity2 = new change_opacity(opacity1, opacityb, step)
+                image.load_image.set_alpha(opacity2)
+                hover = True
+                // Clicking the Button
+                if click[0] == 1 then
+                    click = True
+                endif
+                if click == True AND NOT click[0] then
+                    release = True
+                endif
+                if release then
+                    //If there is an action it is run//
+                    if action != None then
+                        action()
+                    endif
+                    if link != None then
+                        webbrowser.openWriteRead(link)
+                    endif
+                    release = False
+                    click = False
+             else
+                endif
+                time = new pygame.time.get_ticks()
+                hover = False
+                click = False
+                release = False
+                step = new (time - time2) / (animation_time / animation_speed)
+                opacity1 = new change_opacity(opacity2, opacitya, step)
+                image.load_image.set_alpha(opacity1)
+            endif
+        endif
+    endprocedure
+
+    function is_hovered()
+        if hover then
+            return True
+         else
+            return False
+        endif
+    endfunction
+
+    function is_clicking()
+        if click then
+            return True
+         else
+            return False
+        endif
+    endfunction
+
+    function change_color(original_color, new_color, step_multiplier= new 0)
+        colors = []
+        new_color_list = []
+        for rgb1, rgb2 in zip(original_color, new_color):
+            difference = rgb2 - rgb1
+            endif
+            colors.append(difference)
+            endif
+        color_step = [difference / num_frames for difference in colors]
+        endif
+        for og_color_rgb, new_color_rgb, step in zip(original_color, new_color, color_step):
+            if og_color_rgb > new_color_rgb then
+                if int(og_color_rgb + step_multiplier*step) < new_color_rgb then
+                    new_color_list.append(new_color_rgb)
+                 else
+                    new_color_list.append(int(og_color_rgb + step_multiplier*step))
+             else
+                endif
+                if int(og_color_rgb + step_multiplier*step) > new_color_rgb then
+                    new_color_list.append(new_color_rgb)
+                 else
+                    new_color_list.append(int(og_color_rgb + step_multiplier*step))
+                endif
+            endif
+        return tuple(new_color_list)
+    endfunction
+
+    function change_opacity(original_opacity, new_opacity, step_multiplier= new 0)
+        new_opacity_return = None
+        difference = new_opacity - original_opacity
+        endif
+        opacity_step = difference / num_frames
+        endif
+        if original_opacity > new_opacity then
+            if int(original_opacity + opacity_step*step_multiplier) < new_opacity then
+                new_opacity_return = new_opacity
+             else
+                new_opacity_return = new int(original_opacity + opacity_step*step_multiplier)
+         else
+            endif
+            if int(original_opacity + opacity_step*step_multiplier) > new_opacity then
+              new_opacity_return = new_opacity
+             else
+                new_opacity_return = new int(original_opacity + opacity_step*step_multiplier)
+            endif
+        endif
+        return new_opacity_return
+    endfunction
+
+// Created by RealDL - @realdl on discord.
+
