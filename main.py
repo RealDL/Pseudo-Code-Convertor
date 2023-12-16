@@ -7,6 +7,7 @@ class PythonToPseudocode:
         self.by_hand = []
         self.variables = {}
         self.remove_spaces()
+        self.python_syntax()
         self.comments()
         self.iteration()
         self.selection()
@@ -16,6 +17,7 @@ class PythonToPseudocode:
         self.classes()
         self.try_except()
         self.imports()
+        self.super_class()
         self.create_txt_file('pseudocode.txt')
         self.print_pseudocode()
     
@@ -117,6 +119,19 @@ class PythonToPseudocode:
                 else:
                     line = line.replace(":","")
                     self.ending_insert(index,"endwhile")
+            if "for" in line and ":" in line:
+                if "//" in line:
+                    if line.find("//") > line.find("for"):
+                        line = line.replace(":","")
+                        variables = line.split("for ")
+                        variables = variables[1].split(" in")
+                        self.ending_insert(index,f"next {variables}")
+                else:
+                    line = line.replace(":","")
+                    variables = line.split("for ")
+                    variables = variables[1].split(" in")[0]
+                    self.ending_insert(index,f"next {variables}")
+
             self.python_processing[index] = line
    
     def selection(self):
@@ -144,10 +159,10 @@ class PythonToPseudocode:
     def files(self):
         for index, line in enumerate(self.python_processing):
             if "open" in line:
-                if "r" in line:
+                if "'r'" in line:
                     line = line.replace("open","openRead")
                     line = line.replace(',"r"','')
-                if "w" in line:
+                if "'w'" in line:
                     line = line.replace("open","openWrite")
                     line = line.replace(',"w"','')
             if "write" in line:
@@ -274,7 +289,7 @@ class PythonToPseudocode:
     def functions_and_procedures(self):
         for index, line in enumerate(self.python_processing):
             type_of_procedure = ""
-            if "def" in line:
+            if "def " in line:
                 if "self" in line:
                     type_of_procedure = "class"
                 else:
@@ -322,4 +337,62 @@ class PythonToPseudocode:
                         line = line.replace(":","")
                     self.python_processing[index] = line
 
-converter = PythonToPseudocode()
+    def python_syntax(self):
+        for index, line in enumerate(self.python_processing):
+            if ' // ' in line:
+                if '#' in line and '"' not in line:
+                    if line.find("#") > line.find("//"):
+                        line = line.replace("//","DIV")
+                else:
+                    line = line.replace("//","DIV")
+
+            if ' % ' in line:
+                if "#" in line and '"' not in line:
+                    if line.find("#") > line.find("%"):
+                        line = line.replace("//","MOD")
+                else:
+                    line = line.replace("//","MOD")
+
+            if "len(" in line:
+                if "#" in line:
+                    if ":" in line:
+                        line = line.replace(":","")
+                    if line.find("#") > line.find("len("):
+                        variable_list = line.split("len(")
+                        variable_list = variable_list[1].split(")")
+                        variable_name = variable_list[0]
+                        line = line.replace(f"len({variable_name})",f"{variable_name}.length")
+                else:
+                    if ":" in line:
+                        line = line.replace(":","")
+                    variable_list = line.split("len(")
+                    variable_list = variable_list[1].split(")")
+                    variable_name = variable_list[0]
+                    line = line.replace(f"len({variable_name})",f"{variable_name}.length")
+            self.python_processing[index] = line
+
+    def super_class(self):
+        for index, line in enumerate(self.python_processing):
+            find_super = True
+            if "super" in line:
+                if "//" in line:
+                    if line.find("//") < line.find("super"):
+                        find_super = False
+                if find_super:
+                    if "super()" in line:
+                        variable_name = line.replace("super()","")
+                    else:
+                        variable_name = line.replace("super","")
+                    
+                    if "__init__(" in line:
+                        variable_name = variable_name.replace("__init__(","")
+                    if ")" in line:
+                        variable_name = variable_name.replace(")","")
+                    if "." in line:
+                        variable_name = variable_name.replace(".","")
+                    
+                    line = f"super.new({variable_name})"
+                    self.python_processing[index] = line
+
+if "__main__" == __name__:
+    converter = PythonToPseudocode()
