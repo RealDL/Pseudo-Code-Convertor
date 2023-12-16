@@ -1,5 +1,5 @@
 # Python to Pseudocode convertor.
-
+![alt text](https://github.com/RealDL/Pseudo-Code-Convertor/blob/main/python.png)
 This script turns regular python code into OCR A-Level pseudocode. It is not exactly like the OCR pseudocode, however, it does successfully translate python into pseudocode. Your welcome. Need any help hit me up on discord @realdl
 
 # How to use
@@ -9,7 +9,7 @@ This script turns regular python code into OCR A-Level pseudocode. It is not exa
 3. Copy your pseudocode from `pseudocode.txt` and your done!
 
 # Example
-Below will be an example of how program works
+Below will be an example of how program works.
 
 # Python
 ```py
